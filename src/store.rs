@@ -2593,9 +2593,20 @@ impl Store {
         Ok(wal_checkpoint_truncate(&self.conn, false)?.0 == 0)
     }
 
-    pub fn checkpoint_create(&self, name: &str) -> Result<CheckpointResponse> {
+    pub fn checkpoint_create(&self, name: &str, dir: Option<&Path>) -> Result<CheckpointResponse> {
         validate_checkpoint_name(name)?;
-        let path = checkpoint_path(&self.database, name)?;
+        let path = match dir {
+            Some(d) => {
+                fs::create_dir_all(d).map_err(|error| {
+                    AppError::new(
+                        "checkpoint_dir_create_failed",
+                        format!("cannot create checkpoint directory {}: {error}", d.display()),
+                    )
+                })?;
+                d.join(format!("{name}.db"))
+            }
+            None => checkpoint_path(&self.database, name)?,
+        };
         create_checkpoint(&self.conn, &path)?;
         Ok(CheckpointResponse {
             scope: self.scope.clone(),

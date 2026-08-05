@@ -612,7 +612,10 @@ Notes:
   plus `after_bytes`.
 - Search queries are private by default; add `--record` only when you want the query wording stored in the durable operation log.
 
-`lwc checkpoint create <NAME>` uses SQLite's online backup API. Restore with
+`lwc checkpoint create <NAME>` uses SQLite's online backup API. Pass
+`--dir <DIR>` to export the checkpoint into an external directory (useful for
+filesystem-level backup jobs that collect wiki databases) instead of the
+default checkpoint folder. Restore with
 `lwc checkpoint restore <NAME>`; LWC first creates a `pre-restore-*` safety
 checkpoint and then rebuilds the projection. Use `source remove <ID>` and
 `page remove <SLUG>` for guarded deletion: sources with citations and pages

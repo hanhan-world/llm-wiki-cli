@@ -772,6 +772,9 @@ enum CheckpointCommand {
     Create {
         /// Safe checkpoint name; an existing checkpoint is never overwritten.
         name: String,
+        /// Export the checkpoint to an external directory instead of the default checkpoint folder.
+        #[arg(long, value_name = "DIR")]
+        dir: Option<PathBuf>,
     },
     /// List named checkpoints in deterministic order.
     List,
@@ -1527,10 +1530,10 @@ fn run(cli: Cli) -> Result<Value> {
             ensure_scope_supported(cli.scope, false, "checkpoint")?;
             let store_path = resolve_live_store_path(cli.scope, &cwd)?;
             match command {
-                CheckpointCommand::Create { name } => {
+                CheckpointCommand::Create { name, dir } => {
                     let store =
                         Store::open_for_read(scope_name(store_path.scope), &store_path.path)?;
-                    to_json(store.checkpoint_create(&name)?)
+                    to_json(store.checkpoint_create(&name, dir.as_deref())?)
                 }
                 CheckpointCommand::List => {
                     let store =
