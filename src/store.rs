@@ -773,6 +773,14 @@ pub struct CheckpointListResponse {
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct BackupResponse {
+    pub scope: String,
+    pub database: String,
+    pub backup_path: String,
+    pub projection_path: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct LintIssue {
     pub code: String,
     pub page: Option<String>,
@@ -2617,6 +2625,40 @@ impl Store {
         })
     }
 
+    pub fn backup_create(&mut self, dir: &Path, name: Option<&str>) -> Result<BackupResponse> {
+        let base = name.unwrap_or("backup");
+        fs::create_dir_all(dir).map_err(|error| {
+            AppError::new(
+                "backup_dir_create_failed",
+                format!("cannot create backup directory {}: {error}", dir.display()),
+            )
+        })?;
+        // Refresh the Markdown projection so the bundle contains the latest materialized wiki.
+        self.materialize_inner(true)?;
+        // Export a full-database snapshot via SQLite online backup.
+        let db_path = dir.join(format!("{base}.db"));
+        create_checkpoint(&self.conn, &db_path)?;
+        // Copy the projected wiki tree into the backup directory.
+        let wiki_root = self
+            .database
+            .parent()
+            .unwrap_or(dir)
+            .join("wiki");
+        let proj_dst = dir.join("wiki");
+        if wiki_root.is_dir() {
+            if proj_dst.exists() {
+                fs::remove_dir_all(&proj_dst)?;
+            }
+            copy_dir_recursive(&wiki_root, &proj_dst)?;
+        }
+        Ok(BackupResponse {
+            scope: self.scope.clone(),
+            database: self.database_string(),
+            backup_path: db_path.to_string_lossy().into_owned(),
+            projection_path: proj_dst.to_string_lossy().into_owned(),
+        })
+    }
+
     pub fn checkpoint_list(&self) -> Result<CheckpointListResponse> {
         let directory = checkpoint_directory(&self.database)?;
         let mut checkpoints = Vec::new();
@@ -3275,6 +3317,26 @@ fn create_checkpoint(source: &Connection, path: &Path) -> Result<()> {
         let _ = fs::remove_file(path);
     }
     result
+}
+
+fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
+    fs::create_dir_all(dst).map_err(|error| {
+        AppError::new(
+            "backup_copy_failed",
+            format!("cannot create {}: {error}", dst.display()),
+        )
+    })?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let file_type = entry.file_type()?;
+        let target = dst.join(entry.file_name());
+        if file_type.is_dir() {
+            copy_dir_recursive(&entry.path(), &target)?;
+        } else if file_type.is_file() {
+            fs::copy(entry.path(), &target)?;
+        }
+    }
+    Ok(())
 }
 
 fn fresh_checkpoint_name(database: &Path, prefix: &str) -> Result<String> {

@@ -266,6 +266,16 @@ enum Command {
         #[command(subcommand)]
         command: CheckpointCommand,
     },
+    /// Export a portable backup bundle (database snapshot + Markdown projection) into one directory.
+    #[command(
+        long_about = "Export a full-database snapshot plus the current Markdown projection into one external directory, \
+useful for filesystem-level backup jobs that collect wiki state.",
+        after_help = "Example:\n  lwc --scope global backup create /backup/lwc --name daily"
+    )]
+    Backup {
+        #[command(subcommand)]
+        command: BackupCommand,
+    },
     /// Search compiled Wiki pages and immutable raw sources.
     #[command(
         long_about = "Search compiled Wiki pages and immutable raw sources with SQLite FTS5.\n\n\
@@ -782,6 +792,18 @@ enum CheckpointCommand {
     Restore {
         /// Existing checkpoint name.
         name: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum BackupCommand {
+    /// Export a full-database snapshot and the current Markdown projection into one directory.
+    Create {
+        /// Destination directory; created if missing.
+        dir: PathBuf,
+        /// Backup base name (default "backup").
+        #[arg(long)]
+        name: Option<String>,
     },
 }
 
@@ -1545,6 +1567,17 @@ fn run(cli: Cli) -> Result<Value> {
                     let response = store.checkpoint_restore(&name)?;
                     store.materialize()?;
                     to_json(response)
+                }
+            }
+        }
+        Command::Backup { command } => {
+            changeset::reject_selector(selected_changeset.as_deref(), "backup")?;
+            ensure_scope_supported(cli.scope, false, "backup")?;
+            let store_path = resolve_live_store_path(cli.scope, &cwd)?;
+            match command {
+                BackupCommand::Create { dir, name } => {
+                    let mut store = Store::open(scope_name(store_path.scope), &store_path.path)?;
+                    to_json(store.backup_create(&dir, name.as_deref())?)
                 }
             }
         }

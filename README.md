@@ -612,6 +612,17 @@ Notes:
   plus `after_bytes`.
 - Search queries are private by default; add `--record` only when you want the query wording stored in the durable operation log.
 
+For a single-command portable backup (database snapshot plus the current
+Markdown projection in one directory), use:
+
+```bash
+lwc --scope global backup create /backup/lwc --name daily
+```
+
+This refreshes the projection, exports a full-database snapshot via SQLite
+online backup, and copies the projected wiki tree into the destination, which
+is convenient for filesystem-level backup jobs.
+
 `lwc checkpoint create <NAME>` uses SQLite's online backup API. Pass
 `--dir <DIR>` to export the checkpoint into an external directory (useful for
 filesystem-level backup jobs that collect wiki databases) instead of the
