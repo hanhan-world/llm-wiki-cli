@@ -1,0 +1,45 @@
+name: Verify lwc Linux build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - upgrade-v0.17.7
+
+permissions:
+  contents: read
+
+jobs:
+  build-linux:
+    name: Check and build Linux binary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check
+        run: cargo check --locked
+
+      - name: Build release binary
+        run: cargo build --locked --release --bin lwc
+
+      - name: Show artifact
+        run: |
+          file target/release/lwc
+          ls -lh target/release/lwc
+
+      - name: Upload Linux binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: lwc-linux-x86_64
+          path: target/release/lwc
+          if-no-files-found: error
+          retention-days: 7
