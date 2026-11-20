@@ -554,3 +554,55 @@ fn artifact_snapshot(tx: &Connection, include_source_content: bool) -> Result<ar
         operations,
     })
 }
+
+impl Store {
+    /// Export a portable backup bundle (database snapshot + projected wiki) to an external directory.
+    pub fn backup_create(&mut self, dir: &Path, name: Option<&str>) -> Result<BackupResponse> {
+        let base = name.unwrap_or("backup");
+        fs::create_dir_all(dir).map_err(|error| {
+            AppError::new(
+                "backup_dir_create_failed",
+                format!("cannot create backup directory {}: {error}", dir.display()),
+            )
+        })?;
+        // Refresh the Markdown projection so the bundle contains the latest materialized wiki.
+        self.materialize_inner(true)?;
+        // Export a full-database snapshot via SQLite online backup.
+        let db_path = dir.join(format!("{base}.db"));
+        create_checkpoint(&self.conn, &db_path)?;
+        // Copy the projected wiki tree into the backup directory.
+        let wiki_root = self
+            .database
+            .parent()
+            .unwrap_or(dir)
+            .join("wiki");
+        let proj_dst = dir.join("wiki");
+        if wiki_root.is_dir() {
+            if proj_dst.exists() {
+                fs::remove_dir_all(&proj_dst)?;
+            }
+            copy_dir_recursive(&wiki_root, &proj_dst)?;
+        }
+        Ok(BackupResponse {
+            scope: self.scope.clone(),
+            database: self.database_string(),
+            backup_path: db_path.to_string_lossy().into_owned(),
+            projection_path: proj_dst.to_string_lossy().into_owned(),
+        })
+    }
+}
+
+fn copy_dir_recursive(source: &Path, destination: &Path) -> Result<()> {
+    fs::create_dir_all(destination)?;
+    for entry in fs::read_dir(source)? {
+        let entry = entry?;
+        let path = entry.path();
+        let target = destination.join(entry.file_name());
+        if path.is_dir() {
+            copy_dir_recursive(&path, &target)?;
+        } else {
+            fs::copy(&path, &target)?;
+        }
+    }
+    Ok(())
+}

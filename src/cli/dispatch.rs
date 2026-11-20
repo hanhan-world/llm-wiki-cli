@@ -1409,10 +1409,10 @@ fn run(cli: Cli) -> Result<Value> {
             ensure_scope_supported(cli.scope, false, "checkpoint")?;
             let store_path = resolve_live_store_path(cli.scope, &cwd)?;
             match command {
-                CheckpointCommand::Create { name } => {
+                CheckpointCommand::Create { name, dir } => {
                     let store =
                         Store::open_for_read(scope_name(store_path.scope), &store_path.path)?;
-                    to_json(store.checkpoint_create(&name)?)
+                    to_json(store.checkpoint_create(&name, dir.as_deref())?)
                 }
                 CheckpointCommand::List => {
                     let store =
@@ -1522,6 +1522,17 @@ fn run(cli: Cli) -> Result<Value> {
                         response["graph_work"] = graph_work;
                     }
                     Ok(response)
+                }
+            }
+        }
+        Command::Backup { command } => {
+            changeset::reject_selector(selected_changeset.as_deref(), "backup")?;
+            ensure_scope_supported(cli.scope, false, "backup")?;
+            let store_path = resolve_live_store_path(cli.scope, &cwd)?;
+            match command {
+                BackupCommand::Create { dir, name } => {
+                    let mut store = Store::open(scope_name(store_path.scope), &store_path.path)?;
+                    to_json(store.backup_create(&dir, name.as_deref())?)
                 }
             }
         }

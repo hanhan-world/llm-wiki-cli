@@ -402,6 +402,15 @@ enum Command {
         #[command(subcommand)]
         command: CheckpointCommand,
     },
+    /// Export a portable backup bundle (database snapshot + projected wiki) to an external directory.
+    #[command(
+        long_about = "Export a portable backup bundle: refresh the Markdown projection, take a SQLite online-backup snapshot, and copy the projected wiki tree into the target directory.",
+        after_help = "Example:\n  lwc --scope global backup create --dir /path/to/backup-dir"
+    )]
+    Backup {
+        #[command(subcommand)]
+        command: BackupCommand,
+    },
     /// Search compiled Wiki pages and immutable raw sources.
     #[command(
         long_about = "Search compiled Wiki pages and immutable raw sources with SQLite FTS5.\n\n\
@@ -1351,6 +1360,9 @@ enum CheckpointCommand {
     Create {
         /// Safe checkpoint name; an existing checkpoint is never overwritten.
         name: String,
+        /// Export to an external directory instead of the store checkpoints/ folder.
+        #[arg(long)]
+        dir: Option<PathBuf>,
     },
     /// List named checkpoints in deterministic order.
     List,
@@ -1358,6 +1370,19 @@ enum CheckpointCommand {
     Restore {
         /// Existing checkpoint name.
         name: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum BackupCommand {
+    /// Create a named backup bundle in an external directory.
+    Create {
+        /// Target directory for the bundle (database snapshot + wiki projection).
+        #[arg(long)]
+        dir: PathBuf,
+        /// Bundle name (default: backup).
+        #[arg(long)]
+        name: Option<String>,
     },
 }
 

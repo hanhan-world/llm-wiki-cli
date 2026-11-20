@@ -1210,6 +1210,14 @@ pub struct CheckpointResponse {
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct BackupResponse {
+    pub scope: String,
+    pub database: String,
+    pub backup_path: String,
+    pub projection_path: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct CheckpointListResponse {
     pub scope: String,
     pub database: String,
